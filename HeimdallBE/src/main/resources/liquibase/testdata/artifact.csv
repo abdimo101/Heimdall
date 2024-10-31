@@ -1,0 +1,7 @@
+uuid,organization_uuid,application_uuid,name,description,environment,host,version,type
+a12e4567-e89b-12d3-a456-426614174013,ace2e137-d6e7-4476-9bc4-5c7a23c17ddd,987e4567-e89b-12d3-a456-426614174010,Backend API,API for the Project Management App,production,api.pmapp.com,1.0,backend
+a12e4567-e89b-12d3-a456-426614174014,ace2e137-d6e7-4476-9bc4-5c7a23c17ddd,987e4567-e89b-12d3-a456-426614174011,Frontend Web App,UI for the Inventory Management App,staging,web.inventoryapp.com,2.3,frontend
+a12e4567-e89b-12d3-a456-426614174015,ace2e137-d6e7-4476-9bc4-5c7a23c17ddd,987e4567-e89b-12d3-a456-426614174012,Database Service,Database for the Customer Relationship App,production,db.crmapp.com,3.5,database
+a12e4567-e89b-12d3-a456-426614174016,ace2e137-d6e7-4476-9bc4-5c7a23c17ddd,987e4567-e89b-12d3-a456-426614174010,Backend Service,Service for backend operations,production,backend.pmapp.com,1.1,backend
+a12e4567-e89b-12d3-a456-426614174017,ace2e137-d6e7-4476-9bc4-5c7a23c17ddd,987e4567-e89b-12d3-a456-426614174011,Frontend Service,Service for frontend operations,staging,frontend.inventoryapp.com,2.4,frontend
+a12e4567-e89b-12d3-a456-426614174018,ace2e137-d6e7-4476-9bc4-5c7a23c17ddd,987e4567-e89b-12d3-a456-426614174012,Database Analytics,Analytics for database,production,analytics.crmapp.com,3.6,database

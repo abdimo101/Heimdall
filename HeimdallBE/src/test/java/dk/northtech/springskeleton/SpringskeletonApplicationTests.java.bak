@@ -1,0 +1,13 @@
+package dk.northtech.springskeleton;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest
+class SpringskeletonApplicationTests {
+
+	@Test
+	void contextLoads() {
+	}
+
+}

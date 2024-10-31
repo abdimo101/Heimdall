@@ -1,0 +1,4 @@
+uuid, organization_uuid, owner_team_uuid, name, description, specification_link
+2e96c9e7-c7b5-47dc-a1b5-90205db97d80,ace2e137-d6e7-4476-9bc4-5c7a23c17ddd,b12e4567-e89b-12d3-a456-426614174016,DRP,Description 1,https://www.google.com
+2e96c9e7-c7b5-47dc-a1b5-90205db97d81,ace2e137-d6e7-4476-9bc4-5c7a23c17ddd,b12e4567-e89b-12d3-a456-426614174017,Documentation,Description 2,https://www.google.com
+2e96c9e7-c7b5-47dc-a1b5-90205db97d82,ace2e137-d6e7-4476-9bc4-5c7a23c17ddd,b12e4567-e89b-12d3-a456-426614174018,GDPR,Description 3,https://www.google.com

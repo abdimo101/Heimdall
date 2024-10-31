@@ -1,0 +1,235 @@
+<div class="flex justify-center">
+  <form [formGroup]="createApplicationForm" class="w-full max-w-6xl">
+    <div class="mb-4">
+      <h3 class="flex justify-center text-3xl">Application Setup</h3>
+    </div>
+    <app-popup-notice></app-popup-notice>
+
+    <!-- Two-column layout -->
+    <div class="flex flex-col items-center">
+
+      <div class="w-11/12  pr-4">
+
+        <!-- Application Name -->
+        <div class="flex items-center mt-4 relative">
+          <p class="mr-2 w-44">Application Name:<span class="text-red-500">*</span><i
+            class="ml-2 cursor-pointer text-gray-800-500 text-xl"
+            title="Enter a name for the Application click for more info"
+            (click)="toggleModal('appNameInfo')">&#9432;</i></p>
+          <input type="text" formControlName="appName" placeholder="Application Name"
+                 class="p-2 border border-gray-300 rounded flex-1" required>
+
+          @if(currentModal === 'appNameInfo'){
+            <div class="absolute top-0 left-0 mt-12 bg-gray-800 p-4 rounded shadow-lg max-w-md w-full z-10">
+              <h2 class="text-xl font-semibold mb-2 text-white">Application Name Info</h2>
+              <p class="text-sm text-white">The application name is an identifier used within the system. It should be descriptive and concise, reflecting the primary purpose or functionality of the application. This name will be displayed in various parts of the system, so choose a name that is easily recognizable and meaningful to users.</p>
+              <div class="flex justify-end mt-4">
+                <button class="btn btn-gray-custom" (click)="toggleModal('appNameInfo')">Close</button>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Application Key -->
+        <div class="flex items-center mt-4 relative">
+          <p class="mr-2 w-44">Application Key:<span class="text-red-500">*</span><i
+            class="ml-2 cursor-pointer text-gray-800-500 text-xl"
+            (click)="toggleModal('appKeyInfo')"
+            title="Enter a key for the Application click for more info"
+          >&#9432;</i></p>
+          <input type="text" formControlName="appKey" placeholder="Application Key"
+                 class="p-2 border border-gray-300 rounded flex-1" required>
+          <!-- Info icon -->
+
+          @if(currentModal === 'appKeyInfo'){
+            <div class="absolute top-0 left-0 mt-12 bg-gray-800 p-4 rounded shadow-lg max-w-md w-full z-10">
+              <h2 class="text-xl font-semibold mb-2 text-white">Application Key Info</h2>
+              <p class="text-sm text-white">The Application Key is a unique identifier within our system that serves as the primary reference for your application across all platforms, services, and integrations. Every interaction, data sync, and connection involving your application will rely on this key to ensure accurate identification and seamless communication between systems. While you have the option to change the Application Key after setup, doing so is a complex process that can result in significant disruptions to existing integrations and services. This may require manual updates across all connected systems to restore functionality. Therefore, it is crucial to select a well-thought-out, stable key during setup to avoid unnecessary complications in the future.</p>
+              <div class="flex justify-end mt-4">
+                <button class="btn btn-gray-custom" (click)="toggleModal('appKeyInfo')">Close</button>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Application Description -->
+        <div class="flex items-center mt-4 relative">
+          <p class="mr-2 w-44">Description:<span class="text-red-500">*</span><i
+            class="ml-2 cursor-pointer text-gray-800-500 text-xl"
+            (click)="toggleModal('appDescriptionInfo')"
+            title="Describe the Application click for more info"
+          >&#9432;</i></p>
+          <textarea formControlName="description" placeholder="Description"
+                    class="p-2 border border-gray-300 rounded flex-1" required></textarea>
+
+        @if(currentModal === 'appDescriptionInfo'){
+          <div class="absolute top-0 left-0 mt-12 bg-gray-800 p-4 rounded shadow-lg max-w-md w-full z-10">
+            <h2 class="text-xl font-semibold mb-2 text-white">Application Description</h2>
+            <p class="text-sm text-white">Enter a clear and concise description of your application. This should include its primary purpose, key features, and any important functionality it offers. Consider describing how the application solves specific problems or benefits users. The description will help others quickly understand the scope and purpose of the app, especially when integrating with other platforms or reviewing it later. Aim for clarity, keeping the explanation brief but informative.</p>
+            <div class="flex justify-end mt-4">
+              <button class="btn btn-gray-custom" (click)="toggleModal('appDescriptionInfo')">Close</button>
+            </div>
+          </div>
+        }
+        </div>
+
+        <!-- Application Status -->
+        <div class="flex items-center mt-4 relative">
+          <p class=" w-44">Application Phase:<i
+            class="ml-2 cursor-pointer text-gray-800-500 text-xl"
+            (click)="toggleModal('appPhaseInfo')"
+            title="Enter what phase the application is in click for more info"
+          >&#9432;</i></p>
+          <select formControlName="appPhase" class="p-2 border ml-2 border-gray-300 rounded flex-1">
+            @for(phase of phases; track phase.uuid)
+            {
+              <option value="{{phase.uuid}}">{{phase.name}}</option>
+            }
+          </select>
+
+          @if(currentModal === 'appPhaseInfo'){
+            <div class="absolute top-0 left-0 mt-12 bg-gray-800 p-4 rounded shadow-lg max-w-md w-full z-10">
+              <h2 class="text-xl font-semibold mb-2 text-white">Application Phase</h2>
+              <p class="text-sm text-white">An app phase refers to a specific stage in the application development and lifecycle management process. Each phase represents distinct activities and goals that contribute to the overall success and functionality of the application. Selecting the appropriate phase is crucial for effectively managing expectations and resources as the app progresses. This selection should be based on your app's current status and future goals. Assess where you are in the development lifecycle and choose a phase that aligns with your objectives to ensure a smooth and successful process.</p>
+              <div class="flex justify-end mt-4">
+                <button class="btn btn-gray-custom" (click)="toggleModal('appPhaseInfo')">Close</button>
+              </div>
+            </div>
+          }
+        </div>
+
+
+        <!-- Who are you -->
+        <div class="flex items-center mt-4 relative">
+          <p class="mr-2 w-44">Who are you:<i
+            class="ml-2 cursor-pointer text-gray-800-500 text-xl"
+            (click)="toggleModal('appWhoAreYouInfo')"
+            title="Who are you for the application click for more info"
+          >&#9432;</i></p>
+          <select formControlName="whoAreYou" class="p-2 border border-gray-300 rounded flex-1">
+            <option value="not picked" disabled selected>Select Application Status</option>
+            <option value="product owner">Product Owner</option>
+            <option value="product manager">Product Manager</option>
+            <option value="developer">Developer</option>
+            <option value="other">Other</option>
+          </select>
+
+          @if(currentModal === 'appWhoAreYouInfo'){
+            <div class="absolute top-0 left-0 mt-12 bg-gray-800 p-4 rounded shadow-lg max-w-md w-full z-10">
+              <h2 class="text-xl font-semibold mb-2 text-white">Who Are You</h2>
+              <p class="text-sm text-white">In this section, you are required to select your role within the application. Choose from the options: Product Owner, Product Manager, Developer, or Other. If you select a role other than Product Owner, please note that a Product Owner will be required to ensure proper alignment and management of project priorities. This helps maintain clarity and direction throughout the development process.</p>
+              <div class="flex justify-end mt-4">
+                <button class="btn btn-gray-custom" (click)="toggleModal('appWhoAreYouInfo')">Close</button>
+              </div>
+            </div>
+          }
+        </div>
+
+
+        @if(!(this.createApplicationForm.get('whoAreYou')?.value === 'product owner') && !(this.createApplicationForm.get('whoAreYou')?.value === '')){
+          <div class="flex items-center mt-4 relative">
+            <p class="mr-2 w-44">Product Owner:<span class="text-red-500">*</span><i
+              class="ml-2 cursor-pointer text-gray-800-500 text-xl"
+              (click)="toggleModal('productOwnerInfo')"
+              title="Who are you for the application click for more info"
+            >&#9432;</i></p>
+            <div class="flex-1 w-full">
+              @if (showPOPicker()) {
+                <app-user-picker (showSignal)="showPOPicker.set($event)"
+                                 (userEmitter)="setProductOwner($event)"></app-user-picker>
+              } @else {
+                <input type="text" readonly placeholder="Product Owner" (click)="showPOPicker.set(true)"
+                       [value]="createApplicationForm.get('productOwner')?.value?.id ? createApplicationForm.get('productOwner')?.value?.name + ' - ' + createApplicationForm.get('productOwner')?.value?.email : ''"
+                       class="p-2 border border-gray-300 rounded flex-1 w-full">
+              }
+            </div>
+            @if(currentModal === 'productOwnerInfo'){
+              <div class="absolute top-0 left-0 mt-12 bg-gray-800 p-4 rounded shadow-lg max-w-md w-full z-10">
+                <h2 class="text-xl font-semibold mb-2 text-white">Product Owner</h2>
+                <p class="text-sm text-white">The Product Owner is responsible for defining the vision and priorities of the application. This role involves gathering and analyzing stakeholder requirements, creating a clear product roadmap, and ensuring that the development team delivers value through effective prioritization of features and tasks. The Product Owner serves as a key liaison between stakeholders and the development team, making decisions that guide the product's direction and ensuring alignment with business goals. Their leadership is crucial for maintaining focus, managing expectations, and driving the successful delivery of the application. You should always make sure you choose the correct product owner, talk with your superior if you are in doubt of who the product owner is.</p>
+                <div class="flex justify-end mt-4">
+                  <button class="btn btn-gray-custom" (click)="toggleModal('productOwnerInfo')">Close</button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        <div class="flex items-center mt-4 cursor-pointer" (click)="toggleExtraDetails()">
+          <span class="text-lg font-semibold">Details</span>
+          <div class="flex-1 border-b-2 border-gray-300 ml-2"></div>
+          <span [ngClass]="{'rotate-90': showExtraDetails, 'rotate-0': !showExtraDetails}" class="ml-2 transition-transform">
+             &#9654; <!-- Right arrow -->
+          </span>
+        </div>
+
+        @if(showExtraDetails){
+          <div class="pl-4">
+          <!-- Application Version -->
+          <div class="flex items-center mt-4 relative">
+            <p class="w-44">Application Version:<i
+              class="ml-2 cursor-pointer text-gray-800-500 text-xl"
+              (click)="toggleModal('VersionInfo')"
+              title="Current version of the application click for more info"
+            >&#9432;</i></p>
+            <input type="text" formControlName="appVersion" placeholder="Application Version"
+                   class="p-2 border border-gray-300 rounded flex-1">
+
+            @if(currentModal === 'VersionInfo'){
+              <div class="absolute top-0 left-0 mt-12 bg-gray-800 p-4 rounded shadow-lg max-w-md w-full z-10">
+                <h2 class="text-xl font-semibold mb-2 text-white">Version</h2>
+                <p class="text-sm text-white">The Version refers to a specific iteration of the application that encapsulates a set of features, enhancements, and fixes released to users. Each version represents a snapshot of the app at a given point in time, allowing stakeholders to track changes and improvements over the lifecycle of the product. Versioning helps manage updates, ensures compatibility, and provides clarity about which features are available to users.</p>
+                <div class="flex justify-end mt-4">
+                  <button class="btn btn-gray-custom" (click)="toggleModal('VersionInfo')">Close</button>
+                </div>
+              </div>
+            }
+          </div>
+
+
+          <!-- Product Owner -->
+          @if(!(this.createApplicationForm.get('whoAreYou')?.value === 'product manager')){
+          <div class="flex items-center mt-4 relative">
+            <p class="w-44">Product Manager:<i
+              class="ml-2 cursor-pointer text-gray-800-500 text-xl"
+              (click)="toggleModal('productManagerInfo')"
+              title="Pick a Product Manager for the application click for more info"
+            >&#9432;</i></p>
+            <div class="flex-1 w-full">
+              @if (showPMPicker()) {
+                <app-user-picker (showSignal)="showPMPicker.set($event)"
+                                 (userEmitter)="setProductManager($event)"></app-user-picker>
+              } @else {
+                <input type="text" readonly placeholder="Product Manager" (click)="showPMPicker.set(true)"
+                       [value]="createApplicationForm.get('productManager')?.value?.id ? createApplicationForm.get('productManager')?.value?.name + ' - ' + createApplicationForm.get('productManager')?.value?.email : ''"
+                       class="p-2 border border-gray-300 rounded flex-1 w-full">
+              }
+            </div>
+            @if(currentModal === 'productManagerInfo'){
+              <div class="absolute top-0 left-0 mt-12 bg-gray-800 p-4 rounded shadow-lg max-w-md w-full z-10">
+                <h2 class="text-xl font-semibold mb-2 text-white">Product Manager</h2>
+                <p class="text-sm text-white">The Product Manager is responsible for overseeing the entire product lifecycle, from conception to launch and beyond. This role involves strategic planning, market research, and collaboration with cross-functional teams to ensure that the product aligns with business objectives and meets user needs. The Product Manager defines the product vision, prioritizes features based on customer feedback and market trends, and manages the execution of the product roadmap. They serve as a central point of communication among stakeholders, ensuring that the development team has a clear understanding of goals and requirements. Their leadership is essential for driving product success and fostering a culture of innovation.</p>
+                <div class="flex justify-end mt-4">
+                  <button class="btn btn-gray-custom" (click)="toggleModal('productManagerInfo')">Close</button>
+                </div>
+              </div>
+            }
+          </div>
+
+          }
+          </div>
+        }
+
+
+    <!-- Create button -->
+    <div class="flex justify-center mt-4">
+      <button class="btn btn-gray-custom" (click)="handleCreate()" [disabled]="createApplicationForm.invalid">Create
+        Application
+      </button>
+    </div>
+  <!--</form>-->
+</div>
+    </div>
+
+
+</form></div>

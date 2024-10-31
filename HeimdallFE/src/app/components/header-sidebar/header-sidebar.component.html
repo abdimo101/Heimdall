@@ -1,0 +1,149 @@
+<div class="h-screen flex flex-col">
+  <header class="bg-gray-900 text-white p-4 border-b-2 flex items-center justify-between shadow-lg">
+    <h1 class="text-2xl font-bold"><a routerLink="/org/home">Heimdall - Organisation</a></h1>
+    <div class="flex space-x-4">
+
+      <div class="dropdown dropdown-end">
+        <div tabindex="0" role="button" class="btn btn-gray-custom relative" (click)="markNotificationsAsSeen()">
+          <span class="material-icons text-2xl bell-icon"><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#ffffff"><path d="M160-200v-80h80v-280q0-83 50-147.5T420-792v-28q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820v28q80 20 130 84.5T720-560v280h80v80H160Zm320-300Zm0 420q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80ZM320-280h320v-280q0-66-47-113t-113-47q-66 0-113 47t-47 113v280Z"/></svg></span>
+
+          <span [class.hidden]="unseenCount === 0" class="absolute top-0 right-0 inline-block w-6 h-6 bg-red-600 text-white rounded-full text-center text-xs">{{ unseenCount }}</span>
+        </div>
+        <ul tabindex="0" class="dropdown-content menu bg-gray-900 rounded-box z-[1] w-80 p-2 shadow border-2 border-gray-300">
+          @for (notification of limitedNotifications; track notification.uuid)
+          {
+            <li>
+              <p [innerHTML]="formatNotification(notification)" class="font-bold"></p>
+              <hr class="my-2 border-white">
+            </li>
+          }
+        </ul>
+      </div>
+
+      <div class="dropdown dropdown-end">
+        <div tabindex="0" role="button" class="btn btn-gray-custom">Teams</div>
+        <ul tabindex="0"
+            class="dropdown-content menu bg-gray-900 rounded-box z-[1] w-52 p-2 shadow border-2 border-gray-300">
+          @for (team of myTeams; track team.uuid) {
+            <li><a routerLink="/org/team/{{team.uuid}}" routerLinkActive="text-blue-300">{{ team.name }}</a>
+              <hr class="my-2 border-white">
+            </li>
+          }
+        </ul>
+      </div>
+      <div class="dropdown dropdown-end">
+        <div tabindex="0" role="button" class="btn btn-gray-custom">{{ this.keycloak.getUsername() }}</div>
+        <ul tabindex="0" class="dropdown-content menu bg-gray-900 rounded-box z-[1] w-52 p-2 shadow border-2">
+          <li><a routerLink='/org/mytasks' routerLinkActive="text-blue-300">My Tasks</a></li>
+          <li><a>Settings</a></li>
+          <li>
+            <button class="" (click)="this.keycloak.logout()">Logout</button>
+          </li>
+        </ul>
+      </div>
+      <div class="search-bar flex items-center mr-4">
+        <input type="text" class="search-input border border-gray-300 rounded px-3 py-2 mr-2 text-gray-800"
+               placeholder="Search..."/>
+        <button class="btn btn-gray-custom px-4 py-2">Search</button>
+      </div>
+    </div>
+
+  </header>
+
+  <div class="flex flex-1 overflow-hidden ">
+    <aside class="w-64 bg-gray-900 text-gray-100 p-4 flex-shrink-0">
+      <a routerLink="/org/home" class="block py-2 px-4 hover:bg-gray-700 text-3xl">Organisation</a>
+      <ul>
+        <div class="collapse collapse-plus bg-gray-800 rounded-lg">
+          <input type="checkbox" class="peer"/>
+          <div class="collapse-title text-lg font-medium text-gray-100 cursor-pointer hover:bg-gray-700 rounded-lg p-2">
+            Me
+          </div>
+          <div class="collapse-content bg-gray-700 rounded-lg p-2 peer-checked:block hidden">
+            <ul>
+              <li>
+                <a
+                  routerLink="/org/mytasks"
+                  routerLinkActive="text-blue-300"
+                  class="block py-2 px-4 hover:bg-gray-600 rounded-lg">
+                  My Tasks
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="collapse collapse-plus bg-gray-800 rounded-lg mt-2">
+          <input type="checkbox" class="peer"/>
+          <div class="collapse-title text-lg font-medium text-gray-100 cursor-pointer hover:bg-gray-700 rounded-lg p-2">
+            Applications
+          </div>
+          <div class="collapse-content bg-gray-700 rounded-lg p-2 peer-checked:block hidden">
+            <ul>
+              <li>
+                <a
+                  routerLink="/org/applicationlist"
+                  routerLinkActive="text-blue-300"
+                  class="block py-2 px-4 hover:bg-gray-600 rounded-lg">
+                  Application List
+                </a>
+              </li>
+              <li>
+                <a
+                  routerLink="/org/applicationsetup"
+                  routerLinkActive="text-blue-300"
+                  class="block py-2 px-4 hover:bg-gray-600 rounded-lg">
+                  Application Setup
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="collapse collapse-plus bg-gray-800 rounded-lg mt-2">
+          <input type="checkbox" class="peer"/>
+          <div class="collapse-title text-lg font-medium text-gray-100 cursor-pointer hover:bg-gray-700 rounded-lg p-2">
+            Teams
+          </div>
+          <div class="collapse-content bg-gray-700 rounded-lg p-2 peer-checked:block hidden">
+            <ul>
+              <li>
+                <a routerLink="/org/teams/create" routerLinkActive="text-blue-300"
+                   class="block py-2 px-4 hover:bg-gray-600 rounded-lg">
+                  Create Team
+                </a>
+              </li>
+              <li>
+                <a
+                  routerLink="/org/allteams"
+                  routerLinkActive="text-blue-300"
+                  class="block py-2 px-4 hover:bg-gray-600 rounded-lg">
+                  All Teams
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="collapse collapse-plus bg-gray-800 rounded-lg mt-2">
+          <input type="checkbox" class="peer"/>
+          <div class="collapse-title text-lg font-medium text-gray-100 cursor-pointer hover:bg-gray-700 rounded-lg p-2">
+            About
+          </div>
+          <div class="collapse-content bg-gray-700 rounded-lg p-2 peer-checked:block hidden">
+            <ul>
+              <li>
+                <a
+                  routerLink="/org/aboutnorthtech"
+                  routerLinkActive="text-blue-300"
+                  class="block py-2 px-4 hover:bg-gray-600 rounded-lg">
+                  North Tech
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </ul>
+    </aside>
+    <main class="flex-1 p-6 overflow-y-auto">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+</div>

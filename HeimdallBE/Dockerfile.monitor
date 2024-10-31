@@ -1,0 +1,13 @@
+FROM alpine:latest
+
+# Install Docker CLI, curl and pip
+RUN apk add --no-cache docker-cli curl docker-compose
+
+# Copy the script into the container
+COPY ./check_backend_and_restart_db.sh /check_backend_and_restart_db.sh
+
+# Make the script executable
+RUN chmod +x /check_backend_and_restart_db.sh
+
+# Set the entrypoint to the script
+ENTRYPOINT ["/bin/sh", "-c", "/check_backend_and_restart_db.sh"]

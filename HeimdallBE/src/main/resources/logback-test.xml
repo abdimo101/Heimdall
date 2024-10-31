@@ -1,0 +1,19 @@
+<configuration>
+    <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%date{HH:mm:ss} %highlight(%-5level %logger{35} - %msg%n)</pattern>
+        </encoder>
+    </appender>
+
+    <!-- A couple of common, noisy modules -->
+    <logger name="com.tngtech.jgiven" level="WARN"/>
+    <logger name="io.netty" level="INFO"/>
+    <logger name="reactor.netty" level="INFO"/>
+    <!-- We want debug info from our own code -->
+    <logger name="dk.northtech" level="DEBUG"/>
+
+    <!-- Log to console at INFO level during test/development -->
+    <root level="INFO">
+        <appender-ref ref="console"/>
+    </root>
+</configuration>

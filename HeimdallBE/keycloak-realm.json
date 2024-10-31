@@ -1,0 +1,58 @@
+{
+  "realm": "Praktik2024KeyCloak",
+  "enabled": true,
+  "clients": [
+    {
+      "clientId": "login-app",
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "http://localhost:8082/*",
+        "http://localhost:8090/*",
+        "http://localhost:4200/*"
+
+      ],
+      "webOrigins": [
+        "http://localhost:8082",
+        "http://localhost:8080",
+        "http://localhost:4200"
+      ]
+    },
+    {
+      "clientId": "heimdall-frontend",
+      "rootUrl": "http://localhost:4200",
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "http://localhost:8080/*",
+        "http://localhost:8082/*",
+        "http://localhost:4200/*"
+      ],
+      "webOrigins": [
+        "http://localhost:8080",
+        "http://localhost:8082",
+        "http://localhost:4200"
+      ],
+      "adminUrl": "http://localhost:4200"
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "user"
+      }
+    ]
+  },
+  "identityProviders": [
+    {
+      "alias": "google",
+      "providerId": "google",
+      "enabled": true,
+      "config": {
+        "clientId": "secret",
+        "clientSecret": "secret",
+        "redirectUri": "http://localhost:8080/realms/Praktik2024KeyCloak/broker/google/endpoint"
+      }
+    }
+  ]
+}

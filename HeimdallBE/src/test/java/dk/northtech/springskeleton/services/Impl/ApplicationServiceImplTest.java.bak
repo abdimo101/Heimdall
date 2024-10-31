@@ -1,0 +1,100 @@
+package dk.northtech.springskeleton.services.Impl;
+
+import dk.northtech.springskeleton.entities.*;
+import dk.northtech.springskeleton.repositories.*;
+import dk.northtech.springskeleton.enums.DocumentType;
+import dk.northtech.springskeleton.services.TaskService;
+import jakarta.transaction.Transactional;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@SpringBootTest
+@Transactional
+class ApplicationServiceImplTest {
+
+    @Autowired
+    private ApplicationServiceImpl applicationService;
+
+    @Autowired
+    private OrganizationRepository organizationRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private TeamRepository teamRepository;
+
+    @Autowired
+    private TaskRepository taskRepository;
+
+    @Autowired
+    private ApplicationRepository applicationRepository;
+
+    @Autowired
+    private TaskService taskService;
+
+    private OrganizationEntity organization;
+    private UserEntity user;
+    private TeamEntity team;
+    private DocumentEntity document;
+    private ApplicationEntity application;
+
+    @BeforeEach
+    void setUp() {
+        organization = new OrganizationEntity("Heimdall_test");
+        organizationRepository.save(organization);
+
+        user = new UserEntity("johndoe@test.com", organization);
+        userRepository.save(user);
+
+        List<UserEntity> users = new ArrayList<>();
+        users.add(user);
+        team = new TeamEntity("HeimdalTest_team", TeamEntity.Type.application, "tager sig af heimdall", "Jane Doe", "Project Manager", "Project Owner", "Solution Architect", "Enterprise Architect", users, organization);
+        teamRepository.save(team);
+
+        List<TeamEntity> teams = new ArrayList<>();
+        teams.add(team);
+
+        DocumentEntity document = new DocumentEntity(DocumentType.drp, "drplink.com", LocalDate.of(2024, 9, 9));
+        List<DocumentEntity> documents = new ArrayList<>();
+        documents.add(document);
+
+        application = new ApplicationEntity(UUID.randomUUID(), "HMDLTEST", "Heimdall test", "1.0", ApplicationEntity.Status.under_development, ApplicationEntity.State.green, "det er en test applikation", teams, documents, organization);
+        applicationRepository.save(application);
+    }
+
+    @Test
+    void checkAppTeamExists() {
+        // Act
+        boolean result = applicationService.checkAppTeamExists(application, TeamEntity.Type.application);
+
+        // Assert
+        assertTrue(result);
+    }
+
+    @Test
+    void assignTaskToTeam() {
+        // Arrange
+        List<ApplicationEntity> applications = new ArrayList<>();
+        applications.add(application);
+
+        TaskEntity task = new TaskEntity(UUID.randomUUID(), TaskEntity.Type.out_of_date, DocumentType.drp, TaskEntity.Status.created, LocalDateTime.now(), "lav en drp", 0, applications, List.of(team), organization);
+        taskRepository.save(task);
+
+        // Act
+        taskService.assignTaskToTeam(team, task);
+
+        // Assert
+        assertEquals("HeimdalTest_team", task.getTeams().get(0).getName());
+    }
+}

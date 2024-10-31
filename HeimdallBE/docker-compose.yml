@@ -1,0 +1,94 @@
+
+services:
+
+  frontend:
+    build: ../HeimdallFE/
+    ports:
+      - "4200:4200"
+    networks:
+      - heimdall-network
+
+  backend:
+    build: ./
+    ports:
+      - "8082:8082"
+    environment:
+      - POSTGRES_URL=jdbc:postgresql://db:5432/heimdalldb
+      - POSTGRES_USERNAME=postgres
+      - POSTGRES_PASSWORD=postgres
+    depends_on:
+      - db
+      - keycloak
+    networks:
+      - heimdall-network
+    entrypoint: /bin/sh -c "until curl -s -o /dev/null http://keycloak:8080/realms/master; do echo 'Waiting for Keycloak...'; sleep 5; done && java -jar /app/app.jar"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8081/actuator/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  db:
+    image: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=heimdalldb
+    networks:
+      - heimdall-network
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    environment:
+      - KC_HEALTH_ENABLED=true
+      - KC_METRICS_ENABLED=true
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://keycloakdb:5432/keycloak
+      - KC_DB_USERNAME=postgres
+      - KC_DB_PASSWORD=password
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak-realm.json:/opt/keycloak/data/import/keycloak-realm.json
+    depends_on:
+      - keycloakdb
+    networks:
+      - heimdall-network
+    command: > 
+      start-dev
+      --import-realm
+
+  keycloakdb:
+    image: postgres
+    ports:
+      - "5442:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=keycloak
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - heimdall-network
+
+  monitor:
+    build:
+        context: .
+        dockerfile: Dockerfile.monitor
+    volumes:
+      - ./check_backend_and_restart_db.sh:/check_backend_and_restart_db.sh
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint: /bin/sh -c "/check_backend_and_restart_db.sh"
+    networks:
+      - heimdall-network
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  heimdall-network:
+    driver: bridge

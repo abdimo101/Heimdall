@@ -1,0 +1,37 @@
+# git
+.gitignore
+.git/
+
+# VSCode
+.vscode/
+
+# eslint
+.eslintrc.json
+
+# docker
+.dockerignore
+Dockerfile
+
+# Maven
+target/
+
+# Logs
+*.log
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Compiled Java files
+*.class
+
+# Java archives
+*.jar
+*.war
+*.ear
+
+# Temporary files
+*.tmp
+
+# Backup files
+*.bak

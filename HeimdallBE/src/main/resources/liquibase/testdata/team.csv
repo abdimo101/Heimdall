@@ -1,0 +1,7 @@
+uuid,organization_uuid,name,type,description,spoc
+b12e4567-e89b-12d3-a456-426614174016,ace2e137-d6e7-4476-9bc4-5c7a23c17ddd,Security Team,security,Handles security issues,1
+b12e4567-e89b-12d3-a456-426614174017,ace2e137-d6e7-4476-9bc4-5c7a23c17ddd,Test Team,test,Handles testing,2
+b12e4567-e89b-12d3-a456-426614174018,ace2e137-d6e7-4476-9bc4-5c7a23c17ddd,Support Team,support,Handles support,3
+b12e4567-e89b-12d3-a456-426614174019,ace2e137-d6e7-4476-9bc4-5c7a23c17ddd,Enterprise Architect Team,enterprise_architect,Handles architecture,4
+b12e4567-e89b-12d3-a456-426614174020,ace2e137-d6e7-4476-9bc4-5c7a23c17ddd,Operation Team,operation,Handles operations,5
+b12e4567-e89b-12d3-a456-426614174021,ace2e137-d6e7-4476-9bc4-5c7a23c17ddd,DevOps Team,devops,Handles DevOps,6

@@ -1,0 +1,1163 @@
+<?xml version="1.1" encoding="UTF-8" standalone="no"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd">
+    <changeSet id="1.0.0:initial" author="MJ">
+
+        <!--### Schemas (default schema: main) ###-->
+        <sql>
+            CREATE SCHEMA IF NOT EXISTS main;
+            CREATE SCHEMA IF NOT EXISTS audit;
+        </sql>
+
+        <!--### Default schema for the user ###-->
+        <sql>
+            ALTER ROLE postgres SET search_path TO main;
+        </sql>
+
+        <!--### Modules ###-->
+        <sql>
+            CREATE EXTENSION pg_trgm;
+        </sql>
+
+        <!--### Enums ###-->
+        <sql>
+            CREATE TYPE application_phase AS ENUM ('IDEA', 'ANALYSIS', 'IMPLEMENTATION', 'TEST', 'PRODUCTION', 'IDEA_ANALYSIS', 'ANALYSIS_IMPLEMENTATION', 'IMPLEMENTATION_TEST', 'TEST_PRODUCTION');
+            CREATE TYPE application_state AS ENUM ('green', 'yellow', 'red');
+            CREATE TYPE artifact_type AS ENUM ('frontend', 'backend', 'database', 'miscellaneous');
+            CREATE TYPE team_type AS ENUM ('security', 'test', 'support', 'enterprise_architect', 'operation', 'devops');
+            CREATE TYPE approval_status AS ENUM ('pending', 'approved', 'denied');
+            CREATE TYPE task_type AS ENUM ('out_of_date', 'soon_out_of_date', 'non_existent');
+            CREATE TYPE task_status AS ENUM ('created', 'assigned', 'completed', 'postponed');
+            CREATE TYPE notification_type AS ENUM ('phase');
+            CREATE TYPE task_target_table AS ENUM ('document', 'approval');
+            CREATE TYPE audit_operation AS ENUM ('INSERT', 'UPDATE', 'DELETE');
+        </sql>
+
+        <!-- ### Functions ### -->
+        <!-- Function to get user id by email, for audit tables -->
+        <createProcedure>
+            CREATE OR REPLACE FUNCTION get_user_id_by_email(email_param TEXT)
+            RETURNS BIGINT AS $$
+            DECLARE
+            user_id BIGINT;
+            BEGIN
+                SELECT id
+                INTO user_id
+                FROM users
+                WHERE email = email_param;
+                RETURN user_id;
+            END;
+            $$
+            LANGUAGE plpgsql;
+        </createProcedure>
+
+        <!-- Function to insert audit entry for any table -->
+        <createProcedure>
+            CREATE OR REPLACE FUNCTION insert_audit_entry()
+RETURNS TRIGGER AS $$
+DECLARE
+            user_id bigint;
+    user_email TEXT;
+    audit_table_name TEXT;
+    operation_type TEXT;
+            BEGIN
+    user_email := current_setting('session.user_email', true);
+    user_id := main.get_user_id_by_email(user_email);
+    audit_table_name := format('audit.%s', TG_TABLE_NAME);
+    IF (TG_OP = 'INSERT') THEN
+        operation_type := 'INSERT';
+            EXECUTE format('INSERT INTO %s SELECT $1.*, %L, now(), %L', audit_table_name, operation_type, user_id) USING NEW;
+            RETURN NEW;
+            ELSIF (TG_OP = 'UPDATE') THEN
+        operation_type := 'UPDATE';
+            EXECUTE format('INSERT INTO %s SELECT $1.*, %L, now(), %L', audit_table_name, operation_type, user_id) USING NEW;
+            RETURN NEW;
+            ELSIF (TG_OP = 'DELETE') THEN
+        operation_type := 'DELETE';
+            EXECUTE format('INSERT INTO %s SELECT $1.*, %L, now(), %L', audit_table_name, operation_type, user_id) USING OLD;
+            RETURN OLD;
+            END IF;
+            RETURN NULL;
+            END;
+$$
+            LANGUAGE plpgsql;
+        </createProcedure>
+
+        <createProcedure>
+            CREATE OR REPLACE FUNCTION prevent_update_and_delete()
+        RETURNS TRIGGER AS $$
+            BEGIN
+        RAISE EXCEPTION 'Updates and deletes are not allowed on this table';
+            RETURN NULL;
+            END;
+        $$ LANGUAGE plpgsql;
+        </createProcedure>
+
+        <!--### Tables ###-->
+        <!--# Organization #-->
+        <!-- Organization table -->
+        <createTable tableName="organization">
+            <column name="uuid" type="uuid">
+                <constraints primaryKey="true" nullable="false" primaryKeyName="pk_organization"/>
+            </column>
+            <column name="name" type="text">
+                <constraints nullable="true" unique="false"/>
+            </column>
+        </createTable>
+
+        <!-- Organization audit table -->
+        <sql>
+            CREATE TABLE audit.organization AS
+            SELECT * FROM organization
+            WHERE 1=0;
+            ALTER TABLE audit.organization ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.organization ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.organization ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.organization FROM PUBLIC;
+        </sql>
+
+        <!-- Organization audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER organization_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON organization
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- Organization audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER organization_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.organization
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--# User #-->
+        <!-- User table - named users to avoid conflicts with reserved word and default user table -->
+        <createTable tableName="users">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false" primaryKeyName="pk_users"/>
+            </column>
+            <column name="organization_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_user_organization" references="organization(uuid)"/>
+            </column>
+            <column name="email" type="text">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="name" type="text"/>
+        </createTable>
+        <addAutoIncrement tableName="users" columnName="id"/>
+
+        <!-- User audit table -->
+        <sql>
+            CREATE TABLE audit.users AS
+                SELECT * FROM users
+                WHERE 1=0;
+            ALTER TABLE audit.users ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.users ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.users ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.users FROM PUBLIC;
+        </sql>
+
+        <!-- User audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER users_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON users
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- User audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER users_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.users
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!-- Phase table -->
+        <createTable tableName="phase">
+            <column name="uuid" type="uuid">
+                <constraints primaryKey="true" nullable="false" primaryKeyName="pk_phase"/>
+            </column>
+            <column name="organization_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_phase_organization" references="organization(uuid)"/>
+            </column>
+            <column name="name" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="order_number" type="bigint">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint columnNames="organization_uuid, order_number" constraintName="uk_phase_organization_order" tableName="phase"/>
+
+        <!-- Phase audit table -->
+        <sql>
+            CREATE TABLE audit.phase AS
+            SELECT * FROM phase
+            WHERE 1=0;
+            ALTER TABLE audit.phase ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.phase ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.phase ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.phase FROM PUBLIC;
+        </sql>
+
+        <!-- Phase audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER phase_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON phase
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- Phase audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER phase_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.phase
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--# Application #-->
+        <!-- Application table -->
+        <createTable tableName="application">
+            <column name="uuid" type="uuid">
+                <constraints primaryKey="true" nullable="false" primaryKeyName="pk_application"/>
+            </column>
+            <column name="organization_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_application_organization"
+                             references="organization(uuid)"/>
+            </column>
+            <column name="app_key" type="text">
+                <constraints nullable="false" unique="false"/>
+            </column>
+            <column name="name" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="version" type="text"/>
+            <column name="phase_uuid" type="uuid">
+                <constraints foreignKeyName="fk_application_phase" references="phase(uuid)"/>
+            </column>
+            <column name="next_phase_uuid" type="uuid">
+                <constraints foreignKeyName="fk_next_application_phase" references="phase(uuid)"/>
+            </column>
+            <column name="po" type="bigint">
+                <constraints nullable="true" foreignKeyName="fk_application_po" references="users(id)"/>
+            </column>
+            <column name="pm" type="bigint">
+                <constraints nullable="true" foreignKeyName="fk_application_pm" references="users(id)"/>
+            </column>
+            <column name="description" type="text">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!-- Application audit table -->
+        <sql>
+            CREATE TABLE audit.application AS
+            SELECT * FROM application
+            WHERE 1=0;
+            ALTER TABLE audit.application ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.application ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.application ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.application FROM PUBLIC;
+        </sql>
+
+        <!-- Application audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER application_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON application
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- Application audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER application_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.application
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--# Artifact #-->
+        <!-- Artifact table -->
+        <createTable tableName="artifact">
+            <column name="uuid" type="uuid">
+                <constraints primaryKey="true" nullable="false" primaryKeyName="pk_artifact"/>
+            </column>
+            <column name="organization_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_artifact_organization" references="organization(uuid)"/>
+            </column>
+            <column name="application_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_artifact_application" references="application(uuid)"/>
+            </column>
+            <column name="name" type="text"/>
+            <column name="description" type="text"/>
+            <column name="environment" type="text"/>
+            <column name="host" type="text"/>
+            <column name="version" type="text"/>
+            <column name="type" type="artifact_type"/>
+        </createTable>
+
+        <!-- Artifact audit table -->
+        <sql>
+            CREATE TABLE audit.artifact AS
+            SELECT * FROM artifact
+            WHERE 1=0;
+            ALTER TABLE audit.artifact ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.artifact ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.artifact ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.artifact FROM PUBLIC;
+        </sql>
+
+        <!-- Artifact audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER artifact_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON artifact
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- Artifact audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER artifact_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.artifact
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--# Team #-->
+        <!-- Team table -->
+        <createTable tableName="team">
+            <column name="uuid" type="uuid">
+                <constraints primaryKey="true" nullable="false" primaryKeyName="pk_team"/>
+            </column>
+            <column name="organization_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_team_organization" references="organization(uuid)"/>
+            </column>
+            <column name="name" type="text"/>
+            <column name="type" type="team_type"/>
+            <column name="description" type="text"/>
+            <column name="spoc" type="bigint">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+        <addForeignKeyConstraint baseTableName="team"
+                                 baseColumnNames="spoc"
+                                 constraintName="fk_team_users_spoc"
+                                 referencedTableName="users"
+                                 referencedColumnNames="id"
+                                 onDelete="SET NULL"/>
+
+        <!-- Team audit table -->
+        <sql>
+            CREATE TABLE audit.team AS
+            SELECT * FROM team
+            WHERE 1=0;
+            ALTER TABLE audit.team ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.team ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.team ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.team FROM PUBLIC;
+        </sql>
+
+        <!-- Team audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER team_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON team
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- Team audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER team_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.team
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!-- Document type table-->
+        <createTable tableName="document_type">
+            <column name="uuid" type="uuid">
+                <constraints primaryKey="true" nullable="false" primaryKeyName="pk_document_type"/>
+            </column>
+            <column name="organization_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_document_type_organization" references="organization(uuid)"/>
+            </column>
+            <column name="owner_team_uuid" type="uuid">
+                <constraints foreignKeyName="fk_document_type_owner_team" references="team(uuid)"/>
+            </column>
+            <column name="name" type="text">
+                <constraints nullable="false"/>
+            </column>
+            <column name="description" type="text"/>
+            <column name="specification_link" type="text"/>
+        </createTable>
+
+        <!-- Document type audit table -->
+        <sql>
+            CREATE TABLE audit.document_type AS
+            SELECT * FROM document_type
+            WHERE 1=0;
+            ALTER TABLE audit.document_type ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.document_type ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.document_type ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.document_type FROM PUBLIC;
+        </sql>
+
+        <!-- Document type audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER document_type_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON document_type
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- Document type audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER document_type_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.document_type
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--# Document #-->
+        <!-- Document table -->
+        <createTable tableName="document">
+            <column name="uuid" type="uuid">
+                <constraints primaryKey="true" nullable="false" primaryKeyName="pk_document"/>
+            </column>
+            <column name="organization_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_document_organization" references="organization(uuid)"/>
+            </column>
+            <column name="document_type_uuid" type="uuid">
+                    <constraints nullable="false" foreignKeyName="fk_document_document_type" references="document_type(uuid)"/>
+            </column>
+            <column name="link" type="text"/>
+        </createTable>
+
+        <!-- Document audit table -->
+        <sql>
+            CREATE TABLE audit.document AS
+            SELECT * FROM document
+            WHERE 1=0;
+            ALTER TABLE audit.document ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.document ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.document ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.document FROM PUBLIC;
+        </sql>
+
+        <!-- Document audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER document_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON document
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- Document audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER document_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.document
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--# Approval #-->
+        <!-- Approval table -->
+        <createTable tableName="approval">
+            <column name="uuid" type="uuid">
+                <constraints primaryKey="true" nullable="false" primaryKeyName="pk_approval"/>
+            </column>
+            <column name="organization_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_approval_organization" references="organization(uuid)"/>
+            </column>
+            <column name="status" type="approval_status"/>
+            <column name="comment" type="text"/>
+            <column name="team_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_approval_team" references="team(uuid)"/>
+            </column>
+        </createTable>
+
+        <!-- Approval audit table -->
+        <sql>
+            CREATE TABLE audit.approval AS
+            SELECT * FROM approval
+            WHERE 1=0;
+            ALTER TABLE audit.approval ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.approval ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.approval ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.approval FROM PUBLIC;
+        </sql>
+
+        <!-- Approval audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER approval_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON approval
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- Approval audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER approval_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.approval
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--# Task #-->
+        <!-- Task table -->
+        <createTable tableName="task">
+            <column name="uuid" type="uuid">
+                <constraints primaryKey="true" nullable="false" primaryKeyName="pk_task"/>
+            </column>
+            <column name="organization_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_task_organization" references="organization(uuid)"/>
+            </column>
+            <column name="type" type="task_type"/>
+            <column name="target_table" type="task_target_table"/>
+            <column name="document_type_uuid" type="uuid"/>
+            <column name="target_uuid" type="uuid"/>
+            <column name="status" type="task_status"/>
+            <column name="description" type="text"/>
+            <column name="application_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_task_application" references="application(uuid)"/>
+            </column>
+        </createTable>
+
+        <!-- Task audit table -->
+        <sql>
+            CREATE TABLE audit.task AS
+            SELECT * FROM task
+            WHERE 1=0;
+            ALTER TABLE audit.task ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.task ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.task ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.task FROM PUBLIC;
+        </sql>
+
+        <!-- Task audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER task_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON task
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- Task audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER task_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.task
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+
+        <!--# Requirement #-->
+        <!-- Requirement table -->
+        <createTable tableName="requirement">
+            <column name="uuid" type="uuid">
+                <constraints primaryKey="true" nullable="false" primaryKeyName="pk_requirement"/>
+            </column>
+            <column name="organization_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_requirement_organization" references="organization(uuid)"/>
+            </column>
+            <column name="team_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_requirement_team" references="team(uuid)"/>
+            </column>
+            <column name="document_type_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_requirement_document_type" references="document_type(uuid)"/>
+            </column>
+            <column name="estimated_wait_time" type="text"/>
+            <column name="phase_uuid" type="uuid">
+              <constraints nullable="false" foreignKeyName="fk_requirement_phase" references="phase(uuid)"/>
+            </column>
+        </createTable>
+
+        <!-- Requirement audit table -->
+        <sql>
+            CREATE TABLE audit.requirement AS
+            SELECT * FROM requirement
+            WHERE 1=0;
+            ALTER TABLE audit.requirement ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.requirement ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.requirement ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.requirement FROM PUBLIC;
+        </sql>
+
+        <!-- Requirement audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER requirement_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON requirement
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- Requirement audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER requirement_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.requirement
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--# Notification #-->
+        <!-- Notification table -->
+        <createTable tableName="notification">
+            <column name="uuid" type="uuid">
+                <constraints primaryKey="true" nullable="false" primaryKeyName="pk_notification"/>
+            </column>
+            <column name="organization_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_notification_organization" references="organization(uuid)"/>
+            </column>
+            <column name="title" type="text"/>
+            <column name="type" type="notification_type"/>
+            <column name="target_uuid" type="uuid"/>
+            <column name="created_at" type="timestamp"/>
+        </createTable>
+
+        <!-- Notification audit table -->
+        <sql>
+            CREATE TABLE audit.notification AS
+            SELECT * FROM notification
+            WHERE 1=0;
+            ALTER TABLE audit.notification ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.notification ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.notification ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.notification FROM PUBLIC;
+        </sql>
+
+        <!-- Notification audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER notification_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON notification
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- Notification audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER notification_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.notification
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--# Setting_TTL #-->
+        <!-- Setting_TTL table -->
+        <createTable tableName="setting_ttl">
+            <column name="uuid" type="uuid">
+                <constraints primaryKey="true" nullable="false" primaryKeyName="pk_setting_ttl"/>
+            </column>
+            <column name="organization_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_setting_ttl_organization" references="organization(uuid)"/>
+            </column>
+            <column name="interval" type="interval"/>
+            <column name="document_type_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_setting_ttl_document_type" references="document_type(uuid)"/>
+            </column>
+        </createTable>
+
+        <!-- Setting_TTL audit table -->
+        <sql>
+            CREATE TABLE audit.setting_ttl AS
+            SELECT * FROM setting_ttl
+            WHERE 1=0;
+            ALTER TABLE audit.setting_ttl ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.setting_ttl ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.setting_ttl ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.setting_ttl FROM PUBLIC;
+        </sql>
+
+        <!-- Setting_TTL audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER setting_ttl_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON setting_ttl
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- Setting_TTL audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER setting_ttl_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.setting_ttl
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--# Setting #-->
+        <!-- Setting table -->
+        <createTable tableName="setting">
+            <column name="organization_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_setting_organization" primaryKey="true" references="organization(uuid)"/>
+            </column>
+            <column name="default_interval" type="interval"/>
+        </createTable>
+
+        <!-- Setting audit table -->
+        <sql>
+            CREATE TABLE audit.setting AS
+            SELECT * FROM setting
+            WHERE 1=0;
+            ALTER TABLE audit.setting ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.setting ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.setting ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.setting FROM PUBLIC;
+        </sql>
+
+        <!-- Setting audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER setting_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON setting
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- Setting audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER setting_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.setting_ttl
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--### Join Tables ###-->
+        <!--# User_Team relation #-->
+        <!-- User_Team table -->
+        <createTable tableName="user_teams">
+            <column name="team_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_user_teams_team" references="team(uuid)" deleteCascade="true"/>
+            </column>
+            <column name="user_id" type="bigint">
+                <constraints nullable="false" foreignKeyName="fk_user_teams_user" references="users(id)" deleteCascade="true"/>
+            </column>
+        </createTable>
+        <addPrimaryKey tableName="user_teams" columnNames="team_uuid, user_id" constraintName="pk_user_teams"/>
+
+        <!-- User_Team audit table -->
+        <sql>
+            CREATE TABLE audit.user_teams AS
+            SELECT * FROM user_teams
+            WHERE 1=0;
+            ALTER TABLE audit.user_teams ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.user_teams ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.user_teams ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.user_teams FROM PUBLIC;
+        </sql>
+
+        <!-- User_Team audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER user_teams_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON user_teams
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- User_Team audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER user_teams_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.user_teams
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--# Application_Team relation #-->
+        <!-- Application_Team table -->
+        <createTable tableName="application_teams">
+            <column name="application_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_application_teams_application" references="application(uuid)" deleteCascade="true"/>
+            </column>
+            <column name="team_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_application_teams_team" references="team(uuid)" deleteCascade="true"/>
+            </column>
+            <column name="responsible_user_id" type="bigint">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+        <addPrimaryKey columnNames="application_uuid, team_uuid"
+                       tableName="application_teams"
+                       constraintName="pk_application_teams"/>
+        <addForeignKeyConstraint baseTableName="application_teams"
+                                 baseColumnNames="team_uuid, responsible_user_id"
+                                 constraintName="fk_application_teams_user_teams"
+                                 referencedTableName="user_teams"
+                                 referencedColumnNames="team_uuid, user_id"
+                                 onDelete="SET NULL"/>
+        <addForeignKeyConstraint baseTableName="application_teams"
+                                 baseColumnNames="responsible_user_id"
+                                 constraintName="fk_application_teams_user"
+                                 referencedTableName="users"
+                                 referencedColumnNames="id"
+                                 onDelete="SET NULL"/>
+
+        <!-- Application_Team audit table -->
+        <sql>
+            CREATE TABLE audit.application_teams AS
+            SELECT * FROM application_teams
+            WHERE 1=0;
+            ALTER TABLE audit.application_teams ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.application_teams ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.application_teams ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.application_teams FROM PUBLIC;
+        </sql>
+
+        <!-- Application_Team audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER application_teams_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON application_teams
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- Application_Team audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER application_teams_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.application_teams
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--# Application_Document relation #-->
+        <!-- Application_Document table -->
+        <createTable tableName="application_documents">
+            <column name="application_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_application_documents_application" references="application(uuid)" deleteCascade="true"/>
+            </column>
+            <column name="document_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_application_documents_document" references="document(uuid)" deleteCascade="true"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="application_documents" columnNames="application_uuid, document_uuid" constraintName="uk_application_documents"/>
+
+        <!-- Application_Document audit table -->
+        <sql>
+            CREATE TABLE audit.application_documents AS
+            SELECT * FROM application_documents
+            WHERE 1=0;
+            ALTER TABLE audit.application_documents ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.application_documents ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.application_documents ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.application_documents FROM PUBLIC;
+        </sql>
+
+        <!-- Application_Document audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER application_documents_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON application_documents
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- Application_Document audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER application_documents_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.application_documents
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--# User_Task relation #-->
+        <!-- User_Task table -->
+        <createTable tableName="user_tasks">
+            <column name="user_id" type="bigint">
+                <constraints nullable="false" foreignKeyName="fk_user_tasks_user" references="users(id)" deleteCascade="true"/>
+            </column>
+            <column name="task_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_user_tasks_task" references="task(uuid)" deleteCascade="true"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="user_tasks" columnNames="user_id, task_uuid" constraintName="uk_user_tasks"/>
+
+        <!-- User_Task audit table -->
+        <sql>
+            CREATE TABLE audit.user_tasks AS
+            SELECT * FROM user_tasks
+            WHERE 1=0;
+            ALTER TABLE audit.user_tasks ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.user_tasks ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.user_tasks ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.user_tasks FROM PUBLIC;
+        </sql>
+
+        <!-- User_Task audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER user_tasks_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON user_tasks
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- User_Task audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER user_tasks_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.user_tasks
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--# Team_Task relation #-->
+        <!-- Team_Task table -->
+        <createTable tableName="team_tasks">
+            <column name="task_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_team_tasks_task" references="task(uuid)" deleteCascade="true"/>
+            </column>
+            <column name="team_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_team_tasks_team" references="team(uuid)" deleteCascade="true"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="team_tasks" columnNames="task_uuid, team_uuid" constraintName="uk_team_tasks"/>
+
+        <!-- Team_Task audit table -->
+        <sql>
+            CREATE TABLE audit.team_tasks AS
+            SELECT * FROM team_tasks
+            WHERE 1=0;
+            ALTER TABLE audit.team_tasks ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.team_tasks ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.team_tasks ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.team_tasks FROM PUBLIC;
+        </sql>
+
+        <!-- Team_Task audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER team_tasks_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON team_tasks
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- Team_Task audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER team_tasks_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.team_tasks
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--# Artifact_Document relation #-->
+        <!-- Artifact_Document table -->
+        <createTable tableName="artifact_documents">
+            <column name="artifact_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_artifact_documents_artifact" references="artifact(uuid)" deleteCascade="true"/>
+            </column>
+            <column name="document_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_artifact_documents_document" references="document(uuid)" deleteCascade="true"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="artifact_documents" columnNames="artifact_uuid, document_uuid" constraintName="uk_artifact_documents"/>
+
+        <!-- Artifact_Document audit table -->
+        <sql>
+            CREATE TABLE audit.artifact_documents AS
+            SELECT * FROM artifact_documents
+            WHERE 1=0;
+            ALTER TABLE audit.artifact_documents ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.artifact_documents ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.artifact_documents ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.artifact_documents FROM PUBLIC;
+        </sql>
+
+        <!-- Artifact_Document audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER artifact_documents_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON artifact_documents
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- Artifact_Document audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER artifact_documents_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.artifact_documents
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--# Approval_Document relation #-->
+        <!-- Approval_Document table -->
+        <createTable tableName="approval_documents">
+            <column name="approval_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_approval_documents_approval" references="approval(uuid)" deleteCascade="true"/>
+            </column>
+            <column name="document_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_approval_documents_document" references="document(uuid)" deleteCascade="true"/>
+            </column>
+        </createTable>
+        <addUniqueConstraint tableName="approval_documents" columnNames="approval_uuid, document_uuid" constraintName="uk_approval_documents"/>
+
+        <!-- Approval_Document audit table -->
+        <sql>
+            CREATE TABLE audit.approval_documents AS
+            SELECT * FROM approval_documents
+            WHERE 1=0;
+            ALTER TABLE audit.approval_documents ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.approval_documents ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.approval_documents ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.approval_documents FROM PUBLIC;
+        </sql>
+
+        <!-- Approval_Document audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER approval_documents_audit_trigger
+                AFTER INSERT OR UPDATE OR DELETE ON approval_documents
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- Approval_Document audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER approval_documents_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.approval_documents
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--# User_Notification relation #-->
+        <!-- User_Notification table -->
+        <createTable tableName="user_notifications">
+            <column name="user_id" type="bigint">
+                <constraints nullable="false" foreignKeyName="fk_user_notifications_user" references="users(id)" deleteCascade="true"/>
+            </column>
+            <column name="notification_uuid" type="uuid">
+                <constraints nullable="false" foreignKeyName="fk_user_notifications_notification" references="notification(uuid)" deleteCascade="true"/>
+            </column>
+            <column name="seen_at" type="timestamp"/>
+        </createTable>
+
+        <!-- User_Notification audit table -->
+        <sql>
+            CREATE TABLE audit.user_notifications AS
+            SELECT * FROM user_notifications
+            WHERE 1=0;
+            ALTER TABLE audit.user_notifications ADD COLUMN operation_type audit_operation;
+            ALTER TABLE audit.user_notifications ADD COLUMN operation_timestamp timestamp;
+            ALTER TABLE audit.user_notifications ADD COLUMN operation_user bigint;
+            REVOKE INSERT, UPDATE, DELETE ON TABLE audit.user_notifications FROM PUBLIC;
+        </sql>
+
+        <!-- User_Notification audit trigger -->
+        <createProcedure>
+            CREATE TRIGGER user_notifications
+                AFTER INSERT OR UPDATE OR DELETE ON user_notifications
+                FOR EACH ROW EXECUTE FUNCTION insert_audit_entry();
+        </createProcedure>
+
+        <!-- User_Notification audit prevent update/delete trigger -->
+        <createProcedure>
+            CREATE TRIGGER user_notifications_audit_prevent_update_delete_trigger
+                BEFORE UPDATE OR DELETE ON audit.user_notifications
+                FOR EACH ROW EXECUTE FUNCTION prevent_update_and_delete();
+        </createProcedure>
+
+        <!--### Indexes ###-->
+        <!-- Add GIN indexes to users.name & users.email for trigram search optimization -->
+        <sql>
+            CREATE INDEX idx_users_name_gin ON "users" USING gin (name gin_trgm_ops);
+            CREATE INDEX idx_users_email_gin ON "users" USING gin (email gin_trgm_ops);
+        </sql>
+
+        <!-- Load Data for Organization -->
+        <loadData file="liquibase/testdata/organization.csv" tableName="organization" separator=",">
+            <column name="uuid" type="uuid"/>
+            <column name="name" type="string"/>
+        </loadData>
+
+        <!-- Load Data for Users -->
+        <loadData file="liquibase/testdata/users.csv" tableName="users" separator=",">
+            <column name="organization_uuid" type="uuid"/>
+            <column name="email" type="string"/>
+            <column name="name" type="string"/>
+        </loadData>
+
+        <!-- Load Data for Phase -->
+        <loadData file="liquibase/testdata/phase.csv" tableName="phase" separator=",">
+            <column name="uuid" type="uuid"/>
+            <column name="organization_uuid" type="uuid"/>
+            <column name="name" type="string"/>
+            <column name="order_number" type="bigint"/>
+        </loadData>
+
+        <!-- Load Data for Application -->
+        <loadData file="liquibase/testdata/application.csv" tableName="application" separator=",">
+            <column name="uuid" type="uuid"/>
+            <column name="organization_uuid" type="uuid"/>
+            <column name="app_key" type="string"/>
+            <column name="name" type="string"/>
+            <column name="version" type="string"/>
+            <column name="phase_uuid" type="uuid"/>
+            <column name="po" type="bigint"/>
+            <column name="pm" type="bigint"/>
+            <column name="description" type="string"/>
+            <column name="next_phase_uuid" type="uuid"/>
+        </loadData>
+
+        <!-- Load Data for Artifact -->
+        <loadData file="liquibase/testdata/artifact.csv" tableName="artifact" separator=",">
+            <column name="uuid" type="uuid"/>
+            <column name="organization_uuid" type="uuid"/>
+            <column name="application_uuid" type="uuid"/>
+            <column name="name" type="string"/>
+            <column name="description" type="string"/>
+            <column name="environment" type="string"/>
+            <column name="host" type="string"/>
+            <column name="version" type="string"/>
+            <column name="type" type="string"/>
+        </loadData>
+
+        <!-- Load Data for Team -->
+        <loadData file="liquibase/testdata/team.csv" tableName="team" separator=",">
+            <column name="uuid" type="uuid"/>
+            <column name="organization_uuid" type="uuid"/>
+            <column name="name" type="string"/>
+            <column name="type" type="string"/>
+            <column name="description" type="string"/>
+            <column name="spoc" type="bigint"/>
+        </loadData>
+
+        <!-- Load Data for document_type -->
+        <loadData file="liquibase/testdata/document_type.csv" tableName="document_type" separator=",">
+            <column name="uuid" type="uuid"/>
+            <column name="organization_uuid" type="uuid"/>
+            <column name="owner_team_uuid" type="uuid"/>
+            <column name="name" type="text"/>
+            <column name="description" type="string"/>
+            <column name="specification_link" type="string"/>
+        </loadData>
+
+        <!-- Load Data for Document -->
+       <!-- <loadData file="liquibase/testdata/document.csv" tableName="document" separator=",">
+            <column name="uuid" type="uuid"/>
+            <column name="organization_uuid" type="uuid"/>
+            <column name="document_type_uuid" type="uuid"/>
+            <column name="link" type="string"/>
+        </loadData>-->
+
+        <!-- Load Data for Approval -->
+        <loadData file="liquibase/testdata/approval.csv" tableName="approval" separator=",">
+            <column name="uuid" type="uuid"/>
+            <column name="organization_uuid" type="uuid"/>
+            <column name="status" type="string"/>
+            <column name="comment" type="string"/>
+            <column name="team_uuid" type="uuid"/>
+        </loadData>
+
+        <!-- Load Data for Requirement -->
+        <loadData file="liquibase/testdata/requirement.csv" tableName="requirement" separator=",">
+            <column name="uuid" type="uuid"/>
+            <column name="organization_uuid" type="uuid"/>
+            <column name="team_uuid" type="uuid"/>
+            <column name="document_type_uuid" type="uuid"/>
+            <column name="estimated_wait_time" type="string"/>
+            <column name="phase_uuid" type="uuid"/>
+        </loadData>
+        <!-- Load Data for Notification -->
+        <loadData file="liquibase/testdata/notification.csv" tableName="notification" separator=",">
+            <column name="uuid" type="uuid"/>
+            <column name="organization_uuid" type="uuid"/>
+            <column name="title" type="string"/>
+            <column name="type" type="string"/>
+            <column name="target_uuid" type="uuid"/>
+            <column name="created_at" type="timestamp"/>
+        </loadData>
+
+        <!-- Load Data for Join Tables -->
+        <loadData file="liquibase/testdata/user_teams.csv" tableName="user_teams" separator=",">
+            <column name="team_uuid" type="uuid"/>
+            <column name="user_id" type="bigint"/>
+        </loadData>
+
+        <loadData file="liquibase/testdata/application_teams.csv" tableName="application_teams" separator=",">
+            <column name="application_uuid" type="uuid"/>
+            <column name="team_uuid" type="uuid"/>
+            <column name="responsible_user_id" type="bigint"/>
+        </loadData>
+
+       <!-- <loadData file="liquibase/testdata/application_documents.csv" tableName="application_documents" separator=",">
+            <column name="application_uuid" type="uuid"/>
+            <column name="document_uuid" type="uuid"/>
+        </loadData>-->
+
+
+       <!-- <loadData file="liquibase/testdata/artifact_documents.csv" tableName="artifact_documents" separator=",">
+            <column name="artifact_uuid" type="uuid"/>
+            <column name="document_uuid" type="uuid"/>
+        </loadData>-->
+
+       <!-- <loadData file="liquibase/testdata/approval_documents.csv" tableName="approval_documents" separator=",">
+            <column name="approval_uuid" type="uuid"/>
+            <column name="document_uuid" type="uuid"/>
+        </loadData>-->
+
+        <loadData file="liquibase/testdata/user_notifications.csv" tableName="user_notifications" separator=",">
+            <column name="user_id" type="bigint"/>
+            <column name="notification_uuid" type="uuid"/>
+            <column name="seen_at" type="timestamp"/>
+        </loadData>
+
+        <loadData file="liquibase/testdata/setting.csv" tableName="setting" separator=",">
+            <column name="organization_uuid" type="uuid"/>
+            <column name="default_interval" type="interval"/>
+        </loadData>
+    </changeSet>
+</databaseChangeLog>

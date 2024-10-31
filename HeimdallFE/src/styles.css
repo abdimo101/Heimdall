@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.btn-gray-custom {
+  @apply bg-gray-900 text-white text-sm border-gray-900 rounded-md px-4 py-2 shadow-md transition duration-300 ease-in-out font-semibold;
+}
+
+.btn-gray-small{
+  @apply text-xs py-0.5
+}
+
+.btn-gray-custom:hover {
+  @apply bg-gray-800 shadow-lg;
+}
+
+.btn-gray-custom:active {
+  @apply bg-gray-700 shadow-sm;
+}
+.btn-gray-custom:disabled {
+  @apply bg-gray-500 text-gray-900 cursor-not-allowed;
+}
+
+.custom-table {
+  table-layout: fixed; /* Fixes the table layout for consistent column width */
+  width: 100%; /* Makes the table take full width of its container */
+}
+
+/* Custom column width classes */
+.custom-table th, .custom-table td {
+  padding: 12px; /* Padding for table cells */
+}
+
+.custom-key-column {
+  width: 10%; /* Adjust width as per design  */
+}
+
+.custom-title-column {
+  width: 20%; /* Adjust width as per design  */
+}
+
+.custom-description-column {
+  width: 25%; /* Adjust width as per design */
+}
+
+.custom-env-column {
+  width: 20%; /* Adjust width as per design */
+}
+
+.custom-ttl-column {
+  width: 10%; /* Adjust width as per design */
+}
+
+.custom-link-column {
+  width: 15%; /* Adjust width as per design*/
+}
+
+.custom-button-column {
+  width: 10%; /* Width for the button column */
+  text-align: center; /* Center align button for consistent look */
+}
+
+.bell-icon {
+  color: #0000ff; /* Blue color */
+}
+
+/* Ensure the dropdown content has no extra margins or padding */
+.dropdown-content {
+  margin: 0; /* Remove default margins */
+  padding: 0; /* Remove default padding */
+  max-height: 300px; /* Optional: Set a max height if needed */
+  overflow-y: auto; /* Optional: Add scroll if content exceeds max height */
+}
+
+.dropdown-content li {
+  margin: 0; /* Remove margin from li elements */
+  padding: 10px; /* Adjust padding to fit your needs */
+  list-style: none; /* Remove default list styling */
+}
+
+.dropdown-content li p {
+  margin: 0; /* Remove margin from p elements */
+  padding: 0; /* Remove padding from p elements */
+}
+
+.dropdown-content hr {
+  margin: 0; /* Remove margin from hr elements */
+  padding: 0; /* Remove padding from hr elements */
+}
+
+.dropdown-content a {
+  margin: 0; /* Remove margin from hr elements */
+  padding: 0; /* Remove padding from hr elements */
+}
+
+

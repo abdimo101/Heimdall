@@ -1,0 +1,240 @@
+
+
+<div class="flex items-center flex-col ">
+  <div>
+    <h2 class="text-2xl mb-4"><strong>{{this.team()?.name}}</strong></h2>
+  </div>
+  <div class="grid grid-cols-2 grid-flow-col w-full gap-6">
+    <!-- Document Table -->
+  <div class="flex flex-1 flex-col  ">
+    <div class="flex-1 bg-white min-h-[425px] rounded-lg">
+      <div class="relative flex-1">
+        <ngx-datatable
+          #applicationTable
+          class="material"
+          [columnMode]="ColumnMode.force"
+          [headerHeight]="50"
+          [footerHeight]="50"
+          rowHeight="auto"
+          [limit]="this.filterForm.get('applicationRows')?.value || 4"
+          [rows]="applicationRows"
+          [sorts]="[{ prop: 'key', dir: 'asc' }]"
+        >
+          <ngx-datatable-column name="KEY" prop="key">
+            <ng-template ngx-datatable-cell-template let-row="row">
+              <div class=" cursor-pointer">
+                <span class="chip-content text-gray-500 hover:text-gray-800" (click)="navigateToApplication(row.uuid); $event.stopPropagation()">{{ row.key }}</span>
+              </div>
+            </ng-template>
+          </ngx-datatable-column>
+          <ngx-datatable-column name="Responsible User" prop="responsible_user_name">
+            <ng-template ngx-datatable-cell-template let-row="row">
+              <div class=" cursor-pointer " (click)="navigateToUser(row.responsible_user_id); ">
+               @if(row.responsible_user_id == undefined)
+                {
+                  <button class="btn-gray-custom btn-gray-small" (click)="triggerModal(row.full_application); $event.stopPropagation()">Assign</button>
+                } @else {
+
+
+                <span class="chip-content text-gray-500 hover:text-gray-800 mr-1.5">
+                   {{ row.responsible_user_name }}</span>
+                  <span class="inline-block" (click)="triggerModal(row.full_application); $event.stopPropagation()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="-mb-1.5 hover:fill-gray-800" height="24px" viewBox="0 -960 960 960" width="24px" fill="#6B7280">
+                    <path d="M390-240v-140h-60v-144q0-23 31.5-39.5T440-580q47 0 78.5 16.5T550-524v144h-60v140H390Zm50-360q-26 0-43-17t-17-43q0-26 17-43t43-17q26 0 43 17t17 43q0 26-17 43t-43 17Zm0 480q-150 0-255-105T80-480q0-75 28.5-140.5t77-114q48.5-48.5 114-77T440-840q75 0 140.5 28.5t114 77q48.5 48.5 77 114T800-480v8l73-74 57 56-170 170-170-170 57-56 73 73v-7q0-116-82-198t-198-82q-116 0-198 82t-82 198q1 116 82.5 198T440-200q57 0 107-21.5t88-58.5l57 57q-49 48-113.5 75.5T440-120Z"/>
+    </svg>
+  </span>}
+                 </div>
+            </ng-template>
+          </ngx-datatable-column>
+          <ngx-datatable-column name="Tasks" prop="tasks">
+            <ng-template ngx-datatable-cell-template let-row="row">
+              <div class="">
+                <span class="chip-content text-gray-500 hover:text-gray-800  ">{{row.tasks}}</span>
+              </div>
+            </ng-template>
+          </ngx-datatable-column>
+        </ngx-datatable>
+
+      </div>
+      </div>
+    <div class="flex mb-4 mt-4 -ml-2">
+      <div [formGroup]="filterForm" class="flex">
+        <select formControlName="filterApplication" class="p-2 shadow border ml-2 border-gray-300 rounded mr-2">
+          <option disabled value="">Search for...</option>
+          <option value="key" >Key</option>
+          <option value="responsible user" >Responsible User</option>
+          <option value="tasks" >Tasks</option>
+        </select>
+      </div>
+      <div>
+        <input class="flex rounded-lg shadow p-2 min-w-96"
+               type="text"
+               placeholder="Type to search for chosen field"
+               (keyup)="updateApplicationFilter($event)"
+        />
+      </div>
+    </div>
+    </div>
+
+
+    @if (showAssignModal())
+    {
+
+      <div class="fixed inset-0 flex items-center justify-center bg-gray-500 z-10 bg-opacity-40">
+        <div class="flex flex-col bg-gray-800 rounded-lg w-1/3 items-center">
+          <div >
+            <h3 class="text-lg font-semibold text-white p-4">Assign Responsible User</h3>
+          </div>
+          <div class="w-9/12 pl-4 mb-4 ">
+        @if (showResponsibleUserPicker()) {
+          <app-user-picker (showSignal)="showResponsibleUserPicker.set($event)"
+                           (userEmitter)="checkIfUserIsPartOfTeam($event)"></app-user-picker>
+        } @else {
+          <input type="text" readonly placeholder="Responsible User" (click)="showResponsibleUserPicker.set(true)"
+                 [value]="responsibleUserModal()?.id ? responsibleUserModal()?.name + ' - ' + responsibleUserModal()?.email : ''"
+                 class="p-2 border border-gray-300 rounded flex-1 w-full placeholder-gray-400">
+        }
+        </div>
+          <div class="flex items-center justify-center bg-gray-700 w-full min-h-10 rounded-b-lg">
+          <div class="flex">
+            <button class="btn-gray-custom mb-4 mt-4 mr-4" (click)="assignResponsibleUser()">Assign</button>
+            <button class="btn-gray-custom mb-4 mt-4" (click)="triggerModal(null)">Cancel</button>
+          </div>
+          </div>
+      </div>
+
+
+      </div>
+    }
+
+    <!-- Task Table -->
+    <div class="flex-1">
+    <div class="flex-1 bg-white min-h-[425px] rounded-lg ">
+      <ngx-datatable
+        #taskTable
+
+        class="material"
+        [columnMode]="ColumnMode.force"
+        [headerHeight]="50"
+        [footerHeight]="50"
+        rowHeight="auto"
+        [limit]="this.filterForm.get('taskRows')?.value || 4"
+        [rows]="taskRows"
+        [sorts]="[{ prop: 'key', dir: 'asc' }]"
+      >
+        <ngx-datatable-column name="KEY" prop="key">
+          <ng-template ngx-datatable-cell-template let-row="row">
+            <div class=" cursor-pointer" (click)="toggleTaskModal(row.full_task)" >
+
+              <span class="chip-content text-gray-500 hover:text-gray-800" (click)="navigateToApplication(row.application_uuid); $event.stopPropagation()">{{ row.key }}</span>
+            </div>
+          </ng-template>
+        </ngx-datatable-column>
+        <ngx-datatable-column name="TASK">
+          <ng-template ngx-datatable-cell-template let-row="row">
+            <div class=" cursor-pointer " (click)="toggleTaskModal(row.full_task)">
+              <span class="chip-content text-gray-500 hover:text-gray-800 ">{{ row.task }}</span>
+            </div>
+          </ng-template>
+        </ngx-datatable-column>
+        <ngx-datatable-column name="Type" prop="type">
+          <ng-template ngx-datatable-cell-template let-row="row">
+            <div class="cursor-pointer" (click)="toggleTaskModal(row.full_task)">
+              <span class="chip-content text-gray-500 hover:text-gray-800  ">{{ row.type }}</span>
+            </div>
+          </ng-template>
+        </ngx-datatable-column>
+        <ngx-datatable-column name="Responsible User" prop="responsible_user">
+          <ng-template ngx-datatable-cell-template let-row="row">
+            <div class="cursor-pointer" (click)="toggleTaskModal(row.full_task)">
+              <span class="chip-content text-gray-500 hover:text-gray-800" (click)="navigateToUser(row.responsible_user_id); $event.stopPropagation()">{{ row.responsible_user_name }}</span>
+            </div>
+          </ng-template>
+        </ngx-datatable-column>
+      </ngx-datatable>
+
+    </div>
+      <div class="flex mb-4 mt-4 -ml-2">
+        <div [formGroup]="filterForm" class="flex">
+          <select formControlName="filterTask" class="p-2 shadow border ml-2 border-gray-300 rounded mr-2">
+            <option disabled value="">Search for...</option>
+            <option value="key" >Key</option>
+            <option value="task" >Task</option>
+            <option value="type" >Type</option>
+            <option value="responsible user" >Responsible User</option>
+            <option value="description" >Description</option>
+          </select>
+        </div>
+        <div>
+          <input class="flex rounded-lg shadow p-2 min-w-96"
+                 type="text"
+                 placeholder="Type to search for chosen field"
+                 (keyup)="updateTaskFilter($event)"
+          />
+        </div>
+      </div>
+     </div>
+   </div>
+</div>
+<app-popup-notice></app-popup-notice>
+  @if(showTaskModal())
+  {
+    <app-task-modal
+    [toggleTaskModal]="toggleTaskModal.bind(this)"
+    [currentTask]="this.currentTask"
+    [updateTeam] = "updateTeam.bind(this)"
+    ></app-task-modal>
+  }
+
+  <div class="block bg-white mt-10 border border-gray-300 rounded-lg shadow-md min-w-full" [ngClass]="showRequirement ? '' : 'hover:bg-gray-100 transition-colors duration-300'">
+    <div class="w-full cursor-pointer p-6" (click)="toggleRequirement()">
+      <h2 class="text-lg font-semibold" >Requirements</h2>
+    </div>
+
+
+
+    @if(showRequirement)
+    {
+      <div class="pl-6 pr-6 pb-6">
+      @for(phase of phases(); track phase.uuid)
+      {
+
+        <div class="flex items-center mt-4 cursor-pointer"  (click)="toggleSpecificRequirement(phase.name!); $event.stopPropagation()">
+          <span class="text-lg font-semibold">{{phase.name}}</span>
+          <div class="flex-1 border-b-2 border-gray-300 ml-2"></div>
+          <span [ngClass]="{'rotate-90': phase.name == this.specificRequirement(), 'rotate-0': phase.name != this.specificRequirement()}" class="ml-2 transition-transform">
+      &#9654; <!-- Right arrow -->
+      </span>
+        </div>
+
+        @if(phase.name == this.specificRequirement())
+        {
+          <app-requirement
+            [requirements]="requirements"
+            [phase]="phase.uuid!.toString()"
+            [team]="this.team"
+            [loadRequirements]="loadRequirements.bind(this)"
+            [updateTeam]="updateTeam.bind(this)"></app-requirement>
+        }
+
+      }
+      </div>
+    }
+  </div>
+  <div class="block bg-white mt-10  border border-gray-300 rounded-lg shadow-md  min-w-full " [ngClass]="showMembers ? '' : 'hover:bg-gray-100 transition-colors duration-300'" >
+    <div class="flex items-end p-6 mb-2 cursor-pointer" (click)="toggleMembers(); $event.stopPropagation()">
+      <h2 class="text-lg font-semibold">Members</h2>
+          </div>
+          @if(showMembers)
+          {
+            <app-members
+              [team]="this.team"
+              [teamUuid]="this.teamUuid"
+              [navigateToUser]="this.navigateToUser.bind(this)"
+            ></app-members>
+          }
+  </div>
+
+
+
+

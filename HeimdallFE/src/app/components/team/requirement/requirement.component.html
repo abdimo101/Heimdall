@@ -1,0 +1,196 @@
+
+<div class="pl-4">
+  <div class="flex mb-4 mt-4 -ml-2">
+    <div [formGroup]="this.filterFormReq" class="flex">
+      <select formControlName="filter" class="p-2 shadow border ml-2 border-gray-300 rounded mr-2">
+        <option value="document_type" >Document Type</option>
+        <option value="description" >Description</option>
+        <option value="link" >Link</option>
+        <option value="wait_time" >Wait Time</option>
+        <option value="owner_team" >Owner Team</option>
+      </select>
+    </div>
+    <div>
+      <input class="flex rounded-lg shadow p-2 min-w-96 bg-gray-200 border border-gray-300"
+             type="text"
+             placeholder="Type to search for chosen field"
+             (keyup)="this.updateRequirementFilter($event)"
+      />
+    </div>
+  </div>
+  <ngx-datatable
+    #table
+    class="material"
+    [columnMode]="ColumnMode.force"
+    [headerHeight]="50"
+    [footerHeight]="50"
+    rowHeight="auto"
+    [limit]="6"
+    [rows]="rowsReq"
+  >
+    <ngx-datatable-column name="Document Type" prop="document_type">
+      <ng-template ngx-datatable-cell-template let-row="row">
+        <div class="text-gray-500 hover:text-gray-800 cursor-pointer ">
+          <span class="chip-content ">{{ row.document_type }}</span>
+        </div>
+      </ng-template>
+    </ngx-datatable-column>
+    <ngx-datatable-column name="Description" prop="description">
+      <ng-template ngx-datatable-cell-template let-row="row">
+        <div class="text-gray-500 hover:text-gray-800 cursor-pointer ">
+          <span class="chip-content ">{{ row.description }}</span>
+        </div>
+      </ng-template>
+    </ngx-datatable-column>
+    <ngx-datatable-column name="Link" prop="link">
+      <ng-template ngx-datatable-cell-template let-row="row">
+        <div class="text-gray-500 hover:text-gray-800 cursor-pointer ">
+          <span class="chip-content ">{{ row.link }}</span>
+        </div>
+      </ng-template>
+    </ngx-datatable-column>
+    <ngx-datatable-column name="Wait Time" prop="wait_time">
+      <ng-template ngx-datatable-cell-template let-row="row">
+        <div class="text-gray-500 hover:text-gray-800 cursor-pointer ">
+          <span class="chip-content ">{{ row.wait_time }}</span>
+        </div>
+      </ng-template>
+    </ngx-datatable-column>
+    <ngx-datatable-column name="Owner Team" prop="owner_team">
+    <ng-template ngx-datatable-cell-template let-row="row">
+      <div class="text-gray-500 hover:text-gray-800 cursor-pointer " (click)="navigateToTeam(row.owner_team_uuid)">
+        <span class="chip-content ">{{ row.owner_team }}</span>
+      </div>
+    </ng-template>
+    </ngx-datatable-column>
+    <ngx-datatable-column name="" [sortable]="false">
+      <ng-template ngx-datatable-cell-template let-row="row">
+        <div class="text-gray-500 hover:text-gray-800 cursor-pointer ">
+          <button (click)="deleteRequirement(row.requirement_uuid); $event.stopPropagation()" class="ml-4 text-red-600 hover:text-red-800 flex-none">
+            Delete
+          </button>
+        </div>
+      </ng-template>
+    </ngx-datatable-column>
+
+  </ngx-datatable>
+
+  <div class="flex justify-center items-center">
+    <button type="submit" class=" btn btn-gray-custom" (click)="toggleModal(); $event.stopPropagation()">Add Item To Requirement</button>
+  </div>
+
+  @if(showModal())
+  {
+
+    <div class="fixed inset-0 flex flex-col items-center justify-center bg-gray-500 bg-opacity-40 mt-4 mb-4">
+
+      <div class="flex flex-col items-center bg-gray-800 w-1/3 rounded-t-lg">
+          @if(createNewDocument_type())
+          {
+        <div class="mt-4 mb-4">
+          <h3 class="text-white">Create Document type</h3>
+        </div>
+        <div [formGroup]="createDocument_typeForm" class="flex flex-col w-9/12">
+        <div class="flex mb-4">
+          <label for="document_type" class="text-white mr-2 whitespace-nowrap ">Document type:</label>
+          <input type="text" formControlName="document_type" placeholder="Document type" id="document_type" class="pl-1 h-[28px] rounded w-8/12 flex-1 "/>
+        </div>
+        <div class="flex mb-4">
+          <label for="description" class="text-white mr-2 ">Description:</label>
+          <textarea type="text" formControlName="description" placeholder="Description" id="description" class="ml-[29px] pl-1 rounded w-8/12 flex-1"></textarea>
+        </div>
+        <div class="flex mb-4">
+          <label for="link" class="text-white mr-2 ">Link:<span
+            class="ml-2 text-gray-800-500 text-xl cursor-help"
+            title="Link to more information about your requirement"
+          >&#9432;</span></label>
+          <input type="text" placeholder="Link" formControlName="specification_link" id="link" class="pl-1 ml-[60px] rounded w-8/12 flex-1"/>
+        </div>
+        </div>
+          }
+
+          @else {
+              <div class="mt-4 mb-4">
+                  <h3 class="text-white">Use Existing Document type</h3>
+              </div>
+              <div [formGroup]="addRequirementForm" class="flex flex-col w-9/12">
+                  <div class="flex mb-4">
+                      <label for="document_type" class="text-white mr-2 h-[28px] whitespace-nowrap ">Document type:</label>
+                     <div class="w-full">
+                      @if(showDocument_typePicker())
+                      {
+                          <app-document_type-picker (showSignal)="showDocument_typePicker.set($event)"
+                                                  (document_typeEmitter)="handleDocument_typePicked($event)"></app-document_type-picker>
+                      } @else {
+                      <input type="text" readonly (click)="pickDocument_type()" [value]="this.addRequirementForm.get('document_type')?.value?.uuid ? this.addRequirementForm.get('document_type')?.value?.name : ''" placeholder="Search for Document type" id="document_type_existing" class="pl-1 ml-[2px] h-[28px] rounded w-full flex-1 "/>
+                      }
+                     </div>
+                  </div>
+
+                  <div class="flex mb-4">
+                      <label for="estimated_wait_time_existing" class="text-white mr-[28px] ">Wait Time:<span
+                              class="ml-2 text-gray-800-500 text-xl cursor-help"
+                              title="Estimated wait time for your team to be able to approve a standard submission of this type"
+                      >&#9432;</span></label>
+                      <input type="text" placeholder="Wait Time " formControlName="waitTime" id="estimated_wait_time_existing" class="pl-1 rounded -mr-0.5 w-full flex-1"/>
+                      </div>
+                  </div>
+              <div>
+                  <button class="text-blue-400 mb-4 text-xs" (click)="createNewDocument_type.set(true)">Create new Document type</button>
+              </div>
+          }
+
+      </div>
+
+      <div class="flex justify-center bg-gray-700 w-1/3 rounded-b-lg">
+        <div class="flex flex-col">
+        <div class="flex justify-center mt-4 mb-4">
+            @if(createNewDocument_type())
+            {
+                <button class="btn-gray-custom" [disabled]="createDocument_typeForm.invalid" (click)="createDocument_type(); $event.stopPropagation()">Create Document Type</button>
+                <button class="btn-gray-custom ml-4" (click)="createNewDocument_type.set(false); $event.stopPropagation()">Back</button>
+            } @else {
+                <button class="btn-gray-custom" [disabled]="addRequirementForm.invalid" (click)="addRequirement(); $event.stopPropagation()">Add Requirement</button>
+                <button class="btn-gray-custom ml-4" (click)="toggleModal(); $event.stopPropagation()">Cancel</button>
+            }
+        </div>
+          <div class="flex justify-center mb-4">
+            <button class="text-blue-400 text-xs" (click)="toggleOtherTeamsRequirementsModal()">See other Teams requirements?</button>
+          </div>
+        </div>
+      </div>
+      @if(showOtherTeamsRequirementsModal()) {
+        <div class="flex flex-col items-center bg-gray-500 w-1/3 rounded-b-lg shadow-lg p-6 -mt-2 max-h-96 min-h-20 overflow-y-auto">
+          @if(groupedRequirements().length === 0)
+          {
+            <p class="text-lg text-white">No other Teams have requirements for this phase</p>
+          } @else {
+
+
+          <h3 class="text-lg font-bold text-white mb-4">Other Teams' Requirements</h3>
+
+          @for(team of this.groupedRequirements(); track team.team_name) {
+            <div class="w-full mb-6">
+              <h4 class="text-md font-semibold text-white border-b border-gray-400 mb-2 pb-2">{{team.team_name}}</h4>
+
+              @for(requirement of team.requirements; track requirement.uuid) {
+                <div class="ml-4 mb-3 flex justify-between items-start">
+                  <span class="text-sm text-white flex-1 mr-2"><strong>Document type:</strong> {{requirement.document_type_name}}</span>
+
+                  @if(requirement.estimated_wait_time) {
+                    <span class="text-sm text-gray-200 flex-1 ml-12"><strong>Wait Time:</strong> {{requirement.estimated_wait_time}}</span>
+                  }
+                </div>
+              }
+            </div>
+          }
+          }
+        </div>
+      }
+
+    </div>
+
+  }
+  </div>
+
+

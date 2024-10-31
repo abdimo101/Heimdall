@@ -1,0 +1,85 @@
+package dk.northtech.springskeleton.services.Impl;
+
+import dk.northtech.springskeleton.controllers.dtos.ApprovalDTO;
+import dk.northtech.springskeleton.entities.ApprovalEntity;
+import dk.northtech.springskeleton.entities.DocumentEntity;
+import dk.northtech.springskeleton.entities.OrganizationEntity;
+import dk.northtech.springskeleton.entities.UserEntity;
+import dk.northtech.springskeleton.enums.DocumentType;
+import dk.northtech.springskeleton.repositories.ApprovalRepository;
+import dk.northtech.springskeleton.repositories.DocumentRepository;
+import dk.northtech.springskeleton.repositories.OrganizationRepository;
+import dk.northtech.springskeleton.repositories.UserRepository;
+import dk.northtech.springskeleton.translators.old.ApprovalTranslator;
+import jakarta.transaction.Transactional;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import java.time.LocalDate;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@SpringBootTest
+@Transactional
+class ApprovalServiceImplTest {
+
+    @Autowired
+    private ApprovalTranslator approvalTranslator;
+
+    @Autowired
+    private ApprovalRepository approvalRepository;
+
+    @Autowired
+    private OrganizationRepository organizationRepository;
+
+    @Autowired
+    private DocumentRepository documentRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    private OrganizationEntity organization;
+
+    private DocumentEntity document;
+
+    private UserEntity user;
+
+    @BeforeEach
+    void setUp() {
+        organization = new OrganizationEntity("Heimdall_test");
+        organizationRepository.save(organization);
+        document = new DocumentEntity(DocumentType.drp, "drplink.com", LocalDate.of(2024, 9, 9));
+        documentRepository.save(document);
+        user = new UserEntity("johndoe@test.com", organization);
+        userRepository.save(user);
+
+    }
+
+    @Test
+    void createApproval() {
+        // create approval
+        // Arrange
+        ApprovalDTO approvalDTO = new ApprovalDTO();
+        approvalDTO.setComment("This is a comment");
+        approvalDTO.setDocument(document.createDocumentDTO());
+        approvalDTO.setOrganization(organization.createOrganizationDTO());
+        approvalDTO.setUser(user.createUserDTO());
+        // Act
+        ApprovalDTO createdApproval = approvalTranslator.createApprovalToDTO(approvalDTO, user.getUsername());
+        // Assert
+        assertEquals(1, approvalRepository.findAll().size());
+        // update approval
+        // Arrange
+        createdApproval.setStatus(ApprovalEntity.Status.approved);
+        createdApproval.setComment("This is approved");
+        //user.setUsername("abdi.abdulle@test.dk");
+        //createdApproval.setUser(user.createUserDTO());
+        // Act
+        ApprovalDTO updatedApproval = approvalTranslator.createApprovalToDTO(createdApproval, user.getUsername());
+        // Assert
+        assertEquals(ApprovalEntity.Status.approved, approvalRepository.findById(updatedApproval.getUuid()).get().getStatus());
+    }
+
+}

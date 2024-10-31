@@ -1,0 +1,5 @@
+package dk.northtech.springskeleton.enums;
+
+public enum ApplicationPhase {
+    IDEA, ANALYSIS, IMPLEMENTATION, TEST, PRODUCTION, IDEA_ANALYSIS, ANALYSIS_IMPLEMENTATION, IMPLEMENTATION_TEST, TEST_PRODUCTION
+}

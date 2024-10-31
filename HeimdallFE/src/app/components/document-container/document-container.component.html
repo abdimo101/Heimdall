@@ -1,0 +1,18 @@
+@if (documentIsLoading() || documentTypeIsLoading()) {
+  <div class="flex flex-col mt-32 justify-center items-center">
+    <app-spinner/>
+  </div>
+} @else if (documentTypeExists() && documentExists()) {
+  <app-document
+    [document]="document"
+    [type]="documentTypeName"
+    [typeUuid]="documentTypeUuid"
+    [applicationUuid]="applicationUuid">
+    >
+  </app-document>
+} @else {
+  <div class="flex flex-col h-full justify-center items-center">
+    <p>No document found.</p>
+    <p>Redirecting...</p>
+  </div>
+}

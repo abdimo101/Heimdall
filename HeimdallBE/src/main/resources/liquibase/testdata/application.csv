@@ -1,0 +1,4 @@
+uuid,organization_uuid,app_key,name,version,phase_uuid,po,pm,description,next_phase_uuid
+987e4567-e89b-12d3-a456-426614174010,ace2e137-d6e7-4476-9bc4-5c7a23c17ddd,APP001,Project Management App,1.0,2e2e4567-e89b-12d3-a456-426614174010,1,2,A tool for managing projects,
+987e4567-e89b-12d3-a456-426614174011,ace2e137-d6e7-4476-9bc4-5c7a23c17ddd,APP002,Inventory Management App,2.3,2e2e4567-e89b-12d3-a456-426614174012,2,3,An application to manage inventory levels,
+987e4567-e89b-12d3-a456-426614174012,ace2e137-d6e7-4476-9bc4-5c7a23c17ddd,APP003,Customer Relationship App,3.5,2e2e4567-e89b-12d3-a456-426614174010,3,1,App for managing customer relationships,
